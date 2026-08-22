@@ -12,6 +12,7 @@ import practiceRouter from "./routes/practice.js";
 import progressRouter from "./routes/progress.js";
 import dashboardRouter from "./routes/dashboard.js";
 import syncRouter from "./routes/sync.js";
+import roadmapRouter from "./routes/roadmap.js";
 
 export function createApp() {
   const app = express();
@@ -33,6 +34,7 @@ export function createApp() {
   app.use("/api/progress", progressRouter);
   app.use("/api/dashboard", dashboardRouter);
   app.use("/api/sync", syncRouter);
+  app.use("/api/roadmap", roadmapRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 const sessionSchema = new mongoose.Schema({
   studentId: { type: String, required: true, index: true },
   sessionId: { type: String, required: true, unique: true },
-  type: { type: String, enum: ["diagnostic", "rescue"], required: true },
+  type: { type: String, enum: ["diagnostic", "rescue", "level2"], required: true },
   subject: { type: String, enum: ["literacy", "numeracy"], required: true },
   skill: { type: String, default: null }, // set for 'rescue' sessions
   startedAt: { type: Date, required: true },

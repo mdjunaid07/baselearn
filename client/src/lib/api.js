@@ -94,6 +94,32 @@ export async function trySync(studentId, token) {
   }
 }
 
+// Study Roadmap — online-only for now (no offline queue/sync integration, unlike
+// diagnostic/rescue above): a deliberate, smaller scope for this first version.
+export async function fetchAllRoadmaps(studentId, token) {
+  return apiFetch(`/api/roadmap/${studentId}`, { headers: { Authorization: `Bearer ${token}` } });
+}
+
+export async function fetchRoadmap(studentId, token, subject, skill) {
+  return apiFetch(`/api/roadmap/${studentId}/${subject}/${skill}`, { headers: { Authorization: `Bearer ${token}` } });
+}
+
+export async function setTopicComplete(studentId, token, subject, skill, topicId, complete) {
+  return apiFetch(`/api/roadmap/${studentId}/${subject}/${skill}/topics/${topicId}`, {
+    method: "PATCH",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ complete }),
+  });
+}
+
+export async function submitLevel2Test(studentId, token, subject, skill, { attempts }) {
+  return apiFetch(`/api/roadmap/${studentId}/${subject}/${skill}/level2-submit`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ attempts }),
+  });
+}
+
 export function onConnectivityRestored(callback) {
   window.addEventListener("online", callback);
   return () => window.removeEventListener("online", callback);

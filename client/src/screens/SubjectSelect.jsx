@@ -51,6 +51,9 @@ export default function SubjectSelect() {
         <button onClick={() => navigate("/progress")} className="text-ink/50 text-sm font-bold underline underline-offset-4">
           My Progress
         </button>
+        <button onClick={() => navigate("/study-plan")} className="text-ink/50 text-sm font-bold underline underline-offset-4">
+          My Study Plan
+        </button>
         <button onClick={() => navigate("/dashboard")} className="text-ink/50 text-sm font-bold underline underline-offset-4">
           Parent/Teacher View
         </button>

@@ -10,6 +10,7 @@ import StudentModel from "../models/Student.js";
 import SkillProfileModel from "../models/SkillProfile.js";
 import AttemptModel from "../models/Attempt.js";
 import SessionModel from "../models/Session.js";
+import StudentRoadmapModel from "../models/StudentRoadmap.js";
 
 export async function createStudent({ nickname, avatarId }) {
   if (!isMongoConnected()) return mem.createStudent({ nickname, avatarId });
@@ -103,4 +104,23 @@ export async function getSessions(studentId, filter = {}) {
 
 export function newSessionId() {
   return randomUUID();
+}
+
+export async function getStudentRoadmap(studentId, subject, skill) {
+  if (!isMongoConnected()) return mem.getStudentRoadmap(studentId, subject, skill);
+  return StudentRoadmapModel.findOne({ studentId, subject, skill }).lean();
+}
+
+export async function getStudentRoadmapsForStudent(studentId) {
+  if (!isMongoConnected()) return mem.getStudentRoadmapsForStudent(studentId);
+  return StudentRoadmapModel.find({ studentId }).lean();
+}
+
+export async function saveStudentRoadmap(studentId, subject, skill, data) {
+  if (!isMongoConnected()) return mem.saveStudentRoadmap(studentId, subject, skill, data);
+  return StudentRoadmapModel.findOneAndUpdate(
+    { studentId, subject, skill },
+    { studentId, subject, skill, ...data, updatedAt: new Date() },
+    { upsert: true, new: true }
+  ).lean();
 }

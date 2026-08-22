@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ChevronLeft, LogOut, Users } from "lucide-react";
+import { ChevronLeft, LogOut, Users, AlertTriangle, Trophy } from "lucide-react";
 import { useApp } from "../context/AppContext.jsx";
 import { fetchTeacherStudents } from "../lib/api.js";
 import { SKILL_LABELS } from "../lib/questionBank.js";
@@ -14,20 +14,59 @@ function overallScore(skillProfile) {
   return Math.round(scores.reduce((sum, s) => sum + s, 0) / scores.length);
 }
 
+/** One roadmap's row in a student's card — topics X/Y, current level, and a compact
+ *  pass/fail summary of Level 2 attempt history. Omitted entirely for a student with
+ *  no roadmaps (pre-existing students, or anyone with no weak skills yet) — the
+ *  "Study Plan" section just doesn't render, no "0 roadmaps" placeholder needed. */
+function RoadmapRow({ roadmap }) {
+  const label = SKILL_LABELS[roadmap.skill] ?? roadmap.skill;
+  const done = roadmap.topics.filter((t) => t.complete).length;
+  const total = roadmap.topics.length;
+  const passCount = roadmap.level2Attempts.filter((a) => a.passed).length;
+  const failCount = roadmap.level2Attempts.length - passCount;
+
+  return (
+    <div className="flex items-center justify-between text-xs py-1.5 border-t border-mist/60 first:border-t-0 first:pt-0" title={roadmap.reason ?? undefined}>
+      <div className="flex items-center gap-1.5 min-w-0">
+        {roadmap.flagged && <AlertTriangle size={12} className="text-coral shrink-0" />}
+        <span className="font-semibold text-ink/80 truncate">{label}</span>
+      </div>
+      <div className="flex items-center gap-1.5 text-ink/50 shrink-0">
+        {roadmap.level === 2 ? (
+          <span className="flex items-center gap-1 font-bold text-marigold-dark">
+            <Trophy size={11} /> Level 2
+          </span>
+        ) : (
+          <span>{done}/{total} topics{roadmap.eligibleForLevel2 ? " · ready!" : ""}</span>
+        )}
+        {roadmap.level2Attempts.length > 0 && (
+          <span>
+            · {passCount}✓{failCount > 0 ? ` ${failCount}✗` : ""}
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function StudentCard({ student }) {
   const score = overallScore(student.skillProfile);
   const { tier, label } = masteryTier(score);
   const weakLit = student.weakestSkills?.literacy;
   const weakNum = student.weakestSkills?.numeracy;
+  const roadmaps = student.roadmaps ?? [];
 
   return (
-    <div className="bg-white rounded-2xl p-5 shadow-sm">
+    <div className={`bg-white rounded-2xl p-5 shadow-sm ${student.needsAttention ? "ring-2 ring-coral/50" : ""}`}>
       <div className="flex items-center gap-3 mb-3">
         <div className="w-12 h-12 rounded-full bg-cloud flex items-center justify-center text-2xl shrink-0">
           {AVATAR_EMOJI[student.avatarId] ?? "🌱"}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-bold truncate">{student.nickname}</p>
+          <p className="font-bold truncate flex items-center gap-1.5">
+            {student.nickname}
+            {student.needsAttention && <AlertTriangle size={14} className="text-coral shrink-0" aria-label="Needs attention" />}
+          </p>
           <p className="text-xs text-ink/40 truncate">{student.studentId}</p>
         </div>
         <div className="text-right shrink-0">
@@ -58,6 +97,15 @@ function StudentCard({ student }) {
           {weakNum && (
             <span className="bg-coral/10 text-coral-dark text-xs font-semibold rounded-full px-3 py-1">Needs: {SKILL_LABELS[weakNum]}</span>
           )}
+        </div>
+      )}
+
+      {roadmaps.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-mist">
+          <p className="text-xs font-bold text-ink/40 uppercase tracking-wide mb-1">Study Plan</p>
+          {roadmaps.map((r) => (
+            <RoadmapRow key={`${r.subject}:${r.skill}`} roadmap={r} />
+          ))}
         </div>
       )}
     </div>

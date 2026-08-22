@@ -9,12 +9,14 @@ const students = new Map(); // studentId -> student
 const skillProfiles = new Map(); // studentId -> { studentId, literacy, numeracy, updatedAt }
 const attempts = []; // flat log, filtered per-query
 const sessions = new Map(); // sessionId -> session
+const roadmaps = new Map(); // `${studentId}:${subject}:${skill}` -> roadmap record
 
 export function reset() {
   students.clear();
   skillProfiles.clear();
   attempts.length = 0;
   sessions.clear();
+  roadmaps.clear();
 }
 
 export async function createStudent({ nickname, avatarId }) {
@@ -81,4 +83,22 @@ export async function getSessions(studentId, { subject } = {}) {
     .filter((s) => s.studentId === studentId)
     .filter((s) => !subject || s.subject === subject)
     .sort((a, b) => new Date(a.completedAt) - new Date(b.completedAt));
+}
+
+function roadmapKey(studentId, subject, skill) {
+  return `${studentId}:${subject}:${skill}`;
+}
+
+export async function getStudentRoadmap(studentId, subject, skill) {
+  return roadmaps.get(roadmapKey(studentId, subject, skill)) ?? null;
+}
+
+export async function getStudentRoadmapsForStudent(studentId) {
+  return Array.from(roadmaps.values()).filter((r) => r.studentId === studentId);
+}
+
+export async function saveStudentRoadmap(studentId, subject, skill, data) {
+  const record = { studentId, subject, skill, ...data, updatedAt: new Date().toISOString() };
+  roadmaps.set(roadmapKey(studentId, subject, skill), record);
+  return record;
 }

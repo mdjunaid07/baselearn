@@ -15,6 +15,9 @@ import DailyRescue from "./screens/DailyRescue.jsx";
 import SessionComplete from "./screens/SessionComplete.jsx";
 import ProgressScreen from "./screens/Progress.jsx";
 import ParentDashboard from "./screens/ParentDashboard.jsx";
+import StudyPlan from "./screens/StudyPlan.jsx";
+import Level2Test from "./screens/Level2Test.jsx";
+import Level2Result from "./screens/Level2Result.jsx";
 
 // Both guards wait for authChecked before deciding: the cached token in localStorage
 // is only provisional until AppContext's boot-time /me call confirms it's still a
@@ -49,6 +52,9 @@ export default function App() {
       <Route path="/rescue/:subject" element={<RequireStudent><DailyRescue /></RequireStudent>} />
       <Route path="/session-complete" element={<RequireStudent><SessionComplete /></RequireStudent>} />
       <Route path="/progress" element={<RequireStudent><ProgressScreen /></RequireStudent>} />
+      <Route path="/study-plan" element={<RequireStudent><StudyPlan /></RequireStudent>} />
+      <Route path="/study-plan/level2-result" element={<RequireStudent><Level2Result /></RequireStudent>} />
+      <Route path="/study-plan/:subject/:skill/level2" element={<RequireStudent><Level2Test /></RequireStudent>} />
       <Route path="/dashboard" element={<RequireStudent><ParentDashboard /></RequireStudent>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

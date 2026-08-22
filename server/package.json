@@ -8,7 +8,10 @@
   "scripts": {
     "dev": "node --watch src/index.js",
     "start": "node src/index.js",
-    "selfcheck": "node src/services/adaptiveEngine.selfcheck.js"
+    "selfcheck": "node src/services/adaptiveEngine.selfcheck.js",
+    "selfcheck:roadmap": "node src/services/roadmapService.selfcheck.js",
+    "selfcheck:level2": "node src/services/level2.selfcheck.js",
+    "backfill:roadmaps": "node scripts/backfillRoadmaps.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

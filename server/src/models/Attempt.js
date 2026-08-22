@@ -13,6 +13,10 @@ const attemptSchema = new mongoose.Schema({
   correct: { type: Boolean, required: true },
   responseTimeMs: { type: Number, default: null },
   errorPattern: { type: String, default: null },
+  // Only set on Level 2 test attempts (see level2QuestionBank.js) — which roadmap
+  // topic(s) this question checked, carried onto the attempt log itself so history
+  // doesn't require joining back through the question bank by questionId.
+  topicIds: { type: [String], default: undefined },
   createdAt: { type: Date, default: Date.now },
 });
 
