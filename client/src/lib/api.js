@@ -15,16 +15,18 @@ async function apiFetch(path, options = {}) {
   return res.json();
 }
 
-export async function registerStudent({ studentId, nickname, avatarId }) {
-  return apiFetch("/api/students", { method: "POST", body: JSON.stringify({ studentId, nickname, avatarId }) });
-}
-
 export async function loginStudent({ studentId, pin }) {
   return apiFetch("/api/auth/student/login", { method: "POST", body: JSON.stringify({ studentId, pin }) });
 }
 
 export async function registerStudentPin({ studentId, pin, nickname, avatarId }) {
   return apiFetch("/api/auth/student/register", { method: "POST", body: JSON.stringify({ studentId, pin, nickname, avatarId }) });
+}
+
+/** Re-verifies a cached student token against the backend — the only thing that lets
+ *  AppContext trust a session restored from localStorage on app boot. */
+export async function fetchStudentMe(token) {
+  return apiFetch("/api/auth/student/me", { headers: { Authorization: `Bearer ${token}` } });
 }
 
 export async function loginTeacher({ email, password }) {
@@ -35,16 +37,26 @@ export async function registerTeacher({ name, email, password }) {
   return apiFetch("/api/auth/teacher/register", { method: "POST", body: JSON.stringify({ name, email, password }) });
 }
 
+/** Re-verifies a cached teacher token against the backend — same reasoning as
+ *  fetchStudentMe above. */
+export async function fetchTeacherMe(token) {
+  return apiFetch("/api/auth/teacher/me", { headers: { Authorization: `Bearer ${token}` } });
+}
+
 export async function fetchTeacherStudents(token) {
   return apiFetch("/api/teacher/students", { headers: { Authorization: `Bearer ${token}` } });
 }
 
-export async function fetchDashboard(studentId) {
-  return apiFetch(`/api/dashboard/${studentId}`);
+// Every route below requires proof the caller is either this exact student or a
+// teacher (see requireStudentOrTeacher in server/src/services/auth.service.js) — the
+// backend never trusts the studentId in the URL on its own, so all of these now take
+// a token.
+export async function fetchDashboard(studentId, token) {
+  return apiFetch(`/api/dashboard/${studentId}`, { headers: { Authorization: `Bearer ${token}` } });
 }
 
-export async function fetchProgress(studentId) {
-  return apiFetch(`/api/progress/${studentId}`);
+export async function fetchProgress(studentId, token) {
+  return apiFetch(`/api/progress/${studentId}`, { headers: { Authorization: `Bearer ${token}` } });
 }
 
 /**
@@ -54,22 +66,27 @@ export async function fetchProgress(studentId) {
  * away. If that fails or there's no connection, the event stays queued and is retried
  * next time trySync runs (on an 'online' event or the next app open).
  */
-export async function recordDiagnostic(studentId, payload) {
+export async function recordDiagnostic(studentId, token, payload) {
   enqueueSyncEvent({ type: "diagnostic", payload });
-  return trySync(studentId);
+  return trySync(studentId, token);
 }
 
-export async function recordRescue(studentId, payload) {
+export async function recordRescue(studentId, token, payload) {
   enqueueSyncEvent({ type: "rescue", payload });
-  return trySync(studentId);
+  return trySync(studentId, token);
 }
 
-export async function trySync(studentId) {
+export async function trySync(studentId, token) {
   if (typeof navigator !== "undefined" && !navigator.onLine) return { synced: false, reason: "offline" };
   const queue = getQueue();
   if (queue.length === 0) return { synced: false, reason: "empty" };
+  if (!token) return { synced: false, reason: "no-token" }; // e.g. session expired since the queue was filled
   try {
-    const result = await apiFetch(`/api/sync/${studentId}`, { method: "POST", body: JSON.stringify({ events: queue }) });
+    const result = await apiFetch(`/api/sync/${studentId}`, {
+      method: "POST",
+      body: JSON.stringify({ events: queue }),
+      headers: { Authorization: `Bearer ${token}` },
+    });
     clearQueue();
     return { synced: true, result };
   } catch {
@@ -80,4 +97,18 @@ export async function trySync(studentId) {
 export function onConnectivityRestored(callback) {
   window.addEventListener("online", callback);
   return () => window.removeEventListener("online", callback);
+}
+
+/**
+ * Turns a login/signup failure into a message worth showing a user. apiFetch sets
+ * `.status` on every HTTP-level error (its message is already the server's own,
+ * specific text — e.g. "Too many login attempts..." for a 429) — only a real network
+ * failure (server unreachable, DNS, offline) has no `.status` at all. Collapsing both
+ * into one generic "check your connection" string was the actual bug behind a rate
+ * limit or a 500 being misread as a connectivity problem.
+ */
+export function describeAuthError(err, wrongCredentialsMessage) {
+  if (err.status === 401) return wrongCredentialsMessage;
+  if (err.status) return err.message;
+  return "Couldn't reach the server — check your connection and try again.";
 }

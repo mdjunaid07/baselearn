@@ -1,41 +1,35 @@
-// The single source of identity for this device: a random UUID generated locally,
-// the moment a profile is created, with zero server round-trip required. Nothing
-// else (name, photo, location) is ever asked for or stored.
-const ID_KEY = "flr:studentId";
-const PROFILE_KEY = "flr:localProfile"; // { nickname, avatarId, createdAt }
+// Local cache for the student's session: a JWT issued only by a real signup or login
+// API call (see server/src/services/auth.service.js), plus the profile that came back
+// with it. This is a cache, not the source of truth — AppContext re-verifies the token
+// against GET /api/auth/student/me on boot rather than trusting these values blindly.
+const TOKEN_KEY = "flr:studentToken";
+const PROFILE_KEY = "flr:studentProfile";
 
-export function getStudentId() {
-  return localStorage.getItem(ID_KEY);
+export function getStoredStudentSession() {
+  try {
+    const token = localStorage.getItem(TOKEN_KEY);
+    const raw = localStorage.getItem(PROFILE_KEY);
+    return token && raw ? { token, student: JSON.parse(raw) } : { token: null, student: null };
+  } catch {
+    return { token: null, student: null };
+  }
 }
 
-export function createLocalStudent({ nickname, avatarId }) {
-  const studentId = crypto.randomUUID();
-  const profile = { studentId, nickname: nickname || "Explorer", avatarId: avatarId || "fox", createdAt: new Date().toISOString() };
-  localStorage.setItem(ID_KEY, studentId);
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-  return profile;
+export function storeStudentSession(token, student) {
+  localStorage.setItem(TOKEN_KEY, token);
+  localStorage.setItem(PROFILE_KEY, JSON.stringify(student));
 }
 
-export function getLocalStudent() {
-  const raw = localStorage.getItem(PROFILE_KEY);
-  return raw ? JSON.parse(raw) : null;
-}
-
-export function setActiveStudent(studentId) {
-  localStorage.setItem(ID_KEY, studentId);
-}
-
-/** Stores a profile the server already verified (PIN login) as the active local
- *  student — same storage shape as createLocalStudent, but for an existing studentId
- *  rather than a freshly generated one. */
-export function adoptStudent({ studentId, nickname, avatarId, createdAt }) {
-  const profile = { studentId, nickname: nickname || "Explorer", avatarId: avatarId || "fox", createdAt: createdAt || new Date().toISOString() };
-  localStorage.setItem(ID_KEY, studentId);
-  localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-  return profile;
-}
-
-export function clearLocalStudent() {
-  localStorage.removeItem(ID_KEY);
+export function clearStudentSession() {
+  localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(PROFILE_KEY);
+}
+
+/** A short, typeable login code for self-serve signup — avoids visually ambiguous
+ *  characters (0/O, 1/I) since a child may need to copy it down by hand. */
+export function generateStudentId() {
+  const letters = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const digits = "23456789";
+  const pick = (chars, n) => Array.from({ length: n }, () => chars[Math.floor(Math.random() * chars.length)]).join("");
+  return pick(letters, 3) + pick(digits, 3);
 }

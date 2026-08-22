@@ -26,16 +26,16 @@ function SkillRow({ skill, score }) {
 
 export default function ParentDashboard() {
   const navigate = useNavigate();
-  const { student, skillProfile } = useApp();
+  const { student, studentToken, skillProfile } = useApp();
   const [remote, setRemote] = useState(null);
   const [offlineMode, setOfflineMode] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      if (!student?.studentId) return;
+      if (!student?.studentId || !studentToken) return;
       try {
-        const data = await fetchDashboard(student.studentId);
+        const data = await fetchDashboard(student.studentId, studentToken);
         if (!cancelled) setRemote(data);
       } catch {
         if (!cancelled) setOfflineMode(true);
@@ -45,7 +45,7 @@ export default function ParentDashboard() {
     return () => {
       cancelled = true;
     };
-  }, [student?.studentId]);
+  }, [student?.studentId, studentToken]);
 
   const profile = remote?.skillProfile ?? skillProfile;
   const weakestLiteracy = pickWeakestSkill(profile, "literacy");

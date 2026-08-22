@@ -1,5 +1,6 @@
 import { Router } from "express";
 import * as repo from "../services/repository.js";
+import { requireStudentOrTeacher } from "../services/auth.service.js";
 
 const router = Router();
 
@@ -32,7 +33,7 @@ router.post("/", async (req, res, next) => {
   }
 });
 
-router.get("/:id", async (req, res, next) => {
+router.get("/:id", requireStudentOrTeacher, async (req, res, next) => {
   try {
     const student = await repo.getStudent(req.params.id);
     if (!student) return res.status(404).json({ error: "Student not found" });

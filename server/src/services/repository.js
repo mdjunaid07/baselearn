@@ -19,16 +19,30 @@ export async function createStudent({ nickname, avatarId }) {
   return doc.toObject();
 }
 
+function escapeRegExp(s) {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** Case-insensitive exact match — a Student ID is a typed-by-hand login credential
+ *  (unlike the PIN, it isn't secret), and generateStudentId() on the client produces
+ *  uppercase IDs that a phone keyboard will happily retype in lowercase. Treating
+ *  "ABC123" and "abc123" as the same student avoids a login failure that looks like a
+ *  bug. Legacy IDs (e.g. the demo student's "demo-child-0001") are unaffected since
+ *  this only changes how lookups match, not how IDs are stored. */
+function studentIdQuery(studentId) {
+  return { studentId: new RegExp(`^${escapeRegExp(studentId)}$`, "i") };
+}
+
 export async function getStudent(studentId) {
   if (!isMongoConnected()) return mem.getStudent(studentId);
-  const doc = await StudentModel.findOne({ studentId }).lean();
+  const doc = await StudentModel.findOne(studentIdQuery(studentId)).lean();
   return doc ?? null;
 }
 
 /** Auth-only lookup: the one place pinHash (select:false in the schema) is read back. */
 export async function getStudentAuth(studentId) {
   if (!isMongoConnected()) return mem.getStudent(studentId);
-  const doc = await StudentModel.findOne({ studentId }).select("+pinHash").lean();
+  const doc = await StudentModel.findOne(studentIdQuery(studentId)).select("+pinHash").lean();
   return doc ?? null;
 }
 

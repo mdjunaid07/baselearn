@@ -1,13 +1,14 @@
 import "dotenv/config";
 import { createApp } from "./app.js";
 import { connectDatabase } from "./config/db.js";
-import { seedDemoData } from "./data/seedDemoData.js";
+import { seedDemoData, seedDemoTeacher } from "./data/seedDemoData.js";
 
 const PORT = process.env.PORT || 4000;
 
 async function main() {
   await connectDatabase();
   await seedDemoData();
+  await seedDemoTeacher();
 
   const app = createApp();
   app.listen(PORT, () => {

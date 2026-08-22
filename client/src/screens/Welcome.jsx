@@ -1,18 +1,27 @@
 import { useNavigate, Link } from "react-router-dom";
 import { useState } from "react";
-import { ChildScreen, BigButton, GrowthPlant } from "../components/ui.jsx";
-import { useApp } from "../context/AppContext.jsx";
+import { ChildScreen, BigButton, GrowthPlant, LoadingSprout } from "../components/ui.jsx";
+import { useApp, DEMO_STUDENT_ID, DEMO_STUDENT_PIN } from "../context/AppContext.jsx";
 
 export default function Welcome() {
   const navigate = useNavigate();
-  const { student, loadDemoProfile } = useApp();
+  const { student, authChecked, studentLogin, studentLogout } = useApp();
   const [demoError, setDemoError] = useState(null);
+  const [demoLoading, setDemoLoading] = useState(false);
 
+  /** Same code path as any other student login — just pre-filled with the seeded
+   *  demo account's real credentials, not a client-side shortcut around auth. */
   async function handleViewDemo() {
     setDemoError(null);
-    const result = await loadDemoProfile();
-    if (result.ok) navigate("/dashboard");
-    else setDemoError(result.reason);
+    setDemoLoading(true);
+    try {
+      await studentLogin({ studentId: DEMO_STUDENT_ID, pin: DEMO_STUDENT_PIN });
+      navigate("/dashboard");
+    } catch {
+      setDemoError("The sample profile needs an internet connection the first time it's viewed.");
+    } finally {
+      setDemoLoading(false);
+    }
   }
 
   return (
@@ -27,26 +36,32 @@ export default function Welcome() {
         </div>
       </div>
 
-      <div className="w-full max-w-sm space-y-3">
-        {student ? (
-          <>
-            <BigButton onClick={() => navigate("/subject")}>Continue, {student.nickname}!</BigButton>
-            <BigButton variant="secondary" onClick={() => navigate("/profile")}>New Profile</BigButton>
-          </>
-        ) : (
-          <>
-            <BigButton onClick={() => navigate("/profile")}>Start</BigButton>
-            <BigButton variant="secondary" onClick={() => navigate("/student-login")}>I have a Student ID</BigButton>
-          </>
-        )}
-        <button onClick={handleViewDemo} className="text-ink/40 text-sm font-semibold underline underline-offset-4 mt-2">
-          Judges &amp; teachers: view sample dashboard
-        </button>
-        {demoError && <p className="text-coral-dark text-sm font-semibold">{demoError}</p>}
-        <Link to="/teacher-login" className="block text-ink/40 text-sm font-semibold underline underline-offset-4">
-          Teacher login
-        </Link>
-      </div>
+      {!authChecked ? (
+        <LoadingSprout label="Checking your session..." />
+      ) : (
+        <div className="w-full max-w-sm space-y-3">
+          {student ? (
+            <>
+              <BigButton onClick={() => navigate("/subject")}>Continue, {student.nickname}!</BigButton>
+              <button onClick={studentLogout} className="text-ink/40 text-sm font-semibold underline underline-offset-4">
+                Not you? Log out
+              </button>
+            </>
+          ) : (
+            <>
+              <BigButton onClick={() => navigate("/profile")}>Start</BigButton>
+              <BigButton variant="secondary" onClick={() => navigate("/student-login")}>I have a Student ID</BigButton>
+            </>
+          )}
+          <button onClick={handleViewDemo} disabled={demoLoading} className="text-ink/40 text-sm font-semibold underline underline-offset-4 mt-2 disabled:opacity-50">
+            Judges &amp; teachers: view sample dashboard
+          </button>
+          {demoError && <p className="text-coral-dark text-sm font-semibold">{demoError}</p>}
+          <Link to="/teacher-login" className="block text-ink/40 text-sm font-semibold underline underline-offset-4">
+            Teacher login
+          </Link>
+        </div>
+      )}
     </ChildScreen>
   );
 }

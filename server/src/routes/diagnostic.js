@@ -1,9 +1,10 @@
 import { Router } from "express";
 import { processDiagnosticSubmit } from "../services/sessionProcessor.js";
+import { requireStudentOrTeacher } from "../services/auth.service.js";
 
 const router = Router();
 
-router.post("/:studentId/submit", async (req, res, next) => {
+router.post("/:studentId/submit", requireStudentOrTeacher, async (req, res, next) => {
   try {
     const { subject, sessionId, startedAt, attempts } = req.body ?? {};
     if (!["literacy", "numeracy"].includes(subject)) return res.status(400).json({ error: "subject must be 'literacy' or 'numeracy'" });

@@ -40,16 +40,16 @@ function StatTile({ icon: Icon, value, label, color }) {
 
 export default function ProgressScreen() {
   const navigate = useNavigate();
-  const { student } = useApp();
+  const { student, studentToken } = useApp();
   const [data, setData] = useState(null);
   const [usedLocalFallback, setUsedLocalFallback] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     async function load() {
-      if (student?.studentId && navigator.onLine) {
+      if (student?.studentId && studentToken && navigator.onLine) {
         try {
-          const remote = await fetchProgress(student.studentId);
+          const remote = await fetchProgress(student.studentId, studentToken);
           if (!cancelled) {
             setData(remote);
             return;
@@ -67,7 +67,7 @@ export default function ProgressScreen() {
     return () => {
       cancelled = true;
     };
-  }, [student?.studentId]);
+  }, [student?.studentId, studentToken]);
 
   if (!data) return <ChildScreen><LoadingSprout label="Loading your progress..." /></ChildScreen>;
 

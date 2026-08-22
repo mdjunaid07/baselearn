@@ -25,8 +25,14 @@ export async function createStudent({ nickname, avatarId }) {
   return student;
 }
 
+/** Case-insensitive to match repository.js's Mongo branch — see studentIdQuery there
+ *  for why (a student ID is typed by hand and isn't secret, unlike the PIN). */
 export async function getStudent(studentId) {
-  return students.get(studentId) ?? null;
+  const target = (studentId || "").toLowerCase();
+  for (const student of students.values()) {
+    if (student.studentId.toLowerCase() === target) return student;
+  }
+  return null;
 }
 
 export async function getAllStudents() {

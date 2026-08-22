@@ -19,7 +19,7 @@ const SUBJECT_TITLE = { literacy: "Reading Quick Check", numeracy: "Math Quick C
 export default function Diagnostic() {
   const { subject } = useParams();
   const navigate = useNavigate();
-  const { student, skillProfile, updateSkillProfile } = useApp();
+  const { student, studentToken, skillProfile, updateSkillProfile } = useApp();
   const skills = skillsForSubject(subject);
 
   const [session, setSession] = useState(() => {
@@ -33,8 +33,8 @@ export default function Diagnostic() {
     const weakestSkill = pickWeakestSkill(updatedProfile, subject);
     const weakestScore = updatedProfile[subject][weakestSkill];
 
-    if (student?.studentId) {
-      recordDiagnostic(student.studentId, {
+    if (student?.studentId && studentToken) {
+      recordDiagnostic(student.studentId, studentToken, {
         subject,
         attempts: attempts.map(({ questionId, answer, responseTimeMs }) => ({ questionId, answer, responseTimeMs })),
       });

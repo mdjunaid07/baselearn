@@ -4,10 +4,18 @@
 // Daily Rescue flows a judge actually clicks through are computed for real by the
 // adaptive engine, not faked. Keep those two ideas separate — see DESIGN.md §1.
 import { randomUUID } from "node:crypto";
+import bcrypt from "bcryptjs";
 import * as repo from "../services/repository.js";
+import * as authService from "../services/auth.service.js";
 import { getQuestionsForSkill } from "./questionBank.js";
 
 export const DEMO_STUDENT_ID = "demo-child-0001";
+// Publicly documented on purpose — this is the "Judges & teachers: view sample
+// dashboard" login, a real (if trivial) PIN login rather than a client-side bypass.
+export const DEMO_STUDENT_PIN = "0000";
+
+export const DEMO_TEACHER_EMAIL = "teacher@demo.com";
+export const DEMO_TEACHER_PASSWORD = "teacher123";
 
 function daysAgo(n) {
   const d = new Date();
@@ -16,15 +24,20 @@ function daysAgo(n) {
 }
 
 export async function seedDemoData() {
-  const existing = await repo.getStudent(DEMO_STUDENT_ID);
-  if (existing) return; // already seeded (e.g. real Mongo persisted from a previous run)
+  // getStudentAuth (not getStudent) so this can see pinHash and detect a student that
+  // was persisted (e.g. in Atlas) before login credentials existed for this profile.
+  const existing = await repo.getStudentAuth(DEMO_STUDENT_ID);
+  if (existing?.pinHash) return; // already fully seeded, including login credentials
 
   await repo.upsertStudentRecord({
     studentId: DEMO_STUDENT_ID,
-    nickname: "riya",
-    avatarId: "owl",
-    createdAt: daysAgo(14).toISOString(),
+    nickname: existing?.nickname || "riya",
+    avatarId: existing?.avatarId || "owl",
+    createdAt: existing?.createdAt || daysAgo(14).toISOString(),
+    pinHash: await bcrypt.hash(DEMO_STUDENT_PIN, 10),
   });
+  if (existing) return; // profile already existed (e.g. persisted in Atlas) — just added
+  // the missing PIN, so skip re-seeding session history to avoid duplicating it
 
   // Matches the brief's own skill-map example exactly.
   await repo.saveSkillProfile(DEMO_STUDENT_ID, {
@@ -86,4 +99,18 @@ export async function seedDemoData() {
   }
 
   console.log(`Seeded demo student ${DEMO_STUDENT_ID} ("Riya") with 6 historical sessions.`);
+}
+
+/** Reuses the real registerTeacher path (bcrypt hash, Mongo/in-memory branching, the
+ *  409-on-duplicate-email check) rather than writing credentials directly — this way
+ *  the seeded demo teacher is created through exactly the same, already-tested code
+ *  a real signup would run. */
+export async function seedDemoTeacher() {
+  try {
+    await authService.registerTeacher({ name: "Demo Teacher", email: DEMO_TEACHER_EMAIL, password: DEMO_TEACHER_PASSWORD });
+    console.log(`Seeded demo teacher (${DEMO_TEACHER_EMAIL}).`);
+  } catch (err) {
+    if (err.status === 409) return; // already seeded, e.g. persisted in Atlas from a previous run
+    throw err;
+  }
 }

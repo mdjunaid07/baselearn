@@ -3,10 +3,11 @@ import * as repo from "../services/repository.js";
 import { SKILL_LABELS } from "../data/questionBank.js";
 import { pickWeakestSkill, startingDifficulty, selectPracticeQuestions, emptySkillProfile } from "../services/adaptiveEngine.js";
 import { processRescueSubmit } from "../services/sessionProcessor.js";
+import { requireStudentOrTeacher } from "../services/auth.service.js";
 
 const router = Router();
 
-router.get("/next/:studentId", async (req, res, next) => {
+router.get("/next/:studentId", requireStudentOrTeacher, async (req, res, next) => {
   try {
     const { subject } = req.query;
     if (!["literacy", "numeracy"].includes(subject)) return res.status(400).json({ error: "subject query param must be 'literacy' or 'numeracy'" });
@@ -31,7 +32,7 @@ router.get("/next/:studentId", async (req, res, next) => {
   }
 });
 
-router.post("/:studentId/submit", async (req, res, next) => {
+router.post("/:studentId/submit", requireStudentOrTeacher, async (req, res, next) => {
   try {
     const { subject, skill, sessionId, startedAt, attempts } = req.body ?? {};
     if (!["literacy", "numeracy"].includes(subject)) return res.status(400).json({ error: "subject must be 'literacy' or 'numeracy'" });

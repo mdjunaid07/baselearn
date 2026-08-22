@@ -1,5 +1,6 @@
 import { Router } from "express";
 import * as repo from "../services/repository.js";
+import { requireStudentOrTeacher } from "../services/auth.service.js";
 
 const router = Router();
 
@@ -29,7 +30,7 @@ function historyBySkill(sessions) {
   return history;
 }
 
-router.get("/:studentId", async (req, res, next) => {
+router.get("/:studentId", requireStudentOrTeacher, async (req, res, next) => {
   try {
     const sessions = await repo.getSessions(req.params.studentId);
     res.json({

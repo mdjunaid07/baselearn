@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { processDiagnosticSubmit, processRescueSubmit } from "../services/sessionProcessor.js";
+import { requireStudentOrTeacher } from "../services/auth.service.js";
 
 const router = Router();
 
@@ -7,7 +8,7 @@ const router = Router();
 // Each event is replayed through the exact same logic a live submit would use,
 // in order, so a batch of offline sessions reconciles identically to how it
 // would have if the device had been online the whole time.
-router.post("/:studentId", async (req, res, next) => {
+router.post("/:studentId", requireStudentOrTeacher, async (req, res, next) => {
   try {
     const { events } = req.body ?? {};
     if (!Array.isArray(events)) return res.status(400).json({ error: "events must be an array" });

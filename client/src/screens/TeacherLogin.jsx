@@ -2,6 +2,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { ChevronLeft } from "lucide-react";
 import { useApp } from "../context/AppContext.jsx";
+import { describeAuthError } from "../lib/api.js";
 
 /** Plain email/password login for the adult "Parent & Teacher" world — styled like
  *  ParentDashboard.jsx (bg-cloud / font-body), not the child-facing ChildScreen. */
@@ -27,7 +28,7 @@ export default function TeacherLogin() {
       await teacherLogin({ email, password });
       navigate("/teacher-dashboard");
     } catch (err) {
-      setError(err.status === 401 ? "Incorrect email or password." : "Couldn't log in — check your connection and try again.");
+      setError(describeAuthError(err, "Incorrect email or password."));
     } finally {
       setLoading(false);
     }

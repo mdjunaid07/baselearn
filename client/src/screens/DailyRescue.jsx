@@ -20,7 +20,7 @@ function pickQuestion(subject, skill, targetDifficulty, excludeIds) {
 export default function DailyRescue() {
   const { subject } = useParams();
   const navigate = useNavigate();
-  const { student, skillProfile, updateSkillProfile } = useApp();
+  const { student, studentToken, skillProfile, updateSkillProfile } = useApp();
 
   const [session, setSession] = useState(() => {
     const skill = pickWeakestSkill(skillProfile, subject);
@@ -36,8 +36,8 @@ export default function DailyRescue() {
     const after = updatedProfile[subject][session.skill];
     const correctCount = attempts.filter((a) => a.correct).length;
 
-    if (student?.studentId) {
-      recordRescue(student.studentId, {
+    if (student?.studentId && studentToken) {
+      recordRescue(student.studentId, studentToken, {
         subject,
         skill: session.skill,
         attempts: attempts.map(({ questionId, answer, responseTimeMs }) => ({ questionId, answer, responseTimeMs })),

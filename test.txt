@@ -7,3 +7,16 @@ Password
 ECpRzVvOZdWMED43
 
 mongodb+srv://<db_username>:ECpRzVvOZdWMED43@cluster0.pyocxug.mongodb.net/?appName=Cluster0
+
+
+
+
+
+furqan 
+GHJ736
+4321
+
+
+latheef
+YZR466
+1234

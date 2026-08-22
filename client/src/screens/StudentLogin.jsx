@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ChevronLeft } from "lucide-react";
 import { ChildScreen, BigButton, SpeakerButton, NumericKeypad } from "../components/ui.jsx";
 import { useApp } from "../context/AppContext.jsx";
+import { describeAuthError } from "../lib/api.js";
 
 /** Child-friendly two-step login: type the Student ID a teacher gave you, then tap
  *  your 4-digit PIN on a big number pad — no keyboard needed for the part a young
@@ -30,7 +31,7 @@ export default function StudentLogin() {
       await studentLogin({ studentId: studentId.trim(), pin });
       navigate("/subject");
     } catch (err) {
-      setError(err.status === 401 ? "That ID and PIN don't match. Try again!" : "Couldn't log in — check your connection and try again.");
+      setError(describeAuthError(err, "That ID and PIN don't match. Try again!"));
       setPin("");
     } finally {
       setLoading(false);

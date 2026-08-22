@@ -3,6 +3,7 @@ import * as repo from "../services/repository.js";
 import { LITERACY_SKILLS, NUMERACY_SKILLS, SKILL_LABELS } from "../data/questionBank.js";
 import { pickWeakestSkill, masteryTier, emptySkillProfile } from "../services/adaptiveEngine.js";
 import { buildParentInsight } from "../services/insights.js";
+import { requireStudentOrTeacher } from "../services/auth.service.js";
 
 const router = Router();
 
@@ -10,7 +11,7 @@ function tiersFor(skillScores, skills) {
   return Object.fromEntries(skills.map((s) => [s, { score: skillScores[s], ...masteryTier(skillScores[s]) }]));
 }
 
-router.get("/:studentId", async (req, res, next) => {
+router.get("/:studentId", requireStudentOrTeacher, async (req, res, next) => {
   try {
     const { studentId } = req.params;
     const student = await repo.getStudent(studentId);

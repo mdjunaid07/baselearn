@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useApp } from "./context/AppContext.jsx";
+import { LoadingSprout } from "./components/ui.jsx";
 
 import Welcome from "./screens/Welcome.jsx";
 import ProfileSetup from "./screens/ProfileSetup.jsx";
@@ -15,15 +16,21 @@ import SessionComplete from "./screens/SessionComplete.jsx";
 import ProgressScreen from "./screens/Progress.jsx";
 import ParentDashboard from "./screens/ParentDashboard.jsx";
 
+// Both guards wait for authChecked before deciding: the cached token in localStorage
+// is only provisional until AppContext's boot-time /me call confirms it's still a
+// real, valid session (see AppContext.jsx) — redirecting on the unverified state
+// would either bounce a genuinely logged-in user or, worse, briefly trust a stale one.
 function RequireStudent({ children }) {
-  const { student } = useApp();
+  const { student, authChecked } = useApp();
+  if (!authChecked) return <LoadingSprout />;
   if (!student) return <Navigate to="/" replace />;
   return children;
 }
 
 function RequireTeacher({ children }) {
-  const { teacherToken } = useApp();
-  if (!teacherToken) return <Navigate to="/teacher-login" replace />;
+  const { teacher, authChecked } = useApp();
+  if (!authChecked) return <div className="min-h-screen bg-cloud" />;
+  if (!teacher) return <Navigate to="/teacher-login" replace />;
   return children;
 }
 
