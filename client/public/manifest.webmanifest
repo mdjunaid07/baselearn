@@ -1,0 +1,14 @@
+{
+  "name": "Foundational Learning Rescue",
+  "short_name": "LearnRescue",
+  "description": "Short, adaptive reading and math practice that finds exactly where a child is stuck.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#EAF4FB",
+  "theme_color": "#2F9E63",
+  "orientation": "portrait-primary",
+  "icons": [
+    { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
