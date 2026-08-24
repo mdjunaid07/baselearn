@@ -1,15 +1,111 @@
+Here's the full picture of what you've built, pulled together from everything we've worked through.
+
+**Core idea**
+A foundational literacy and numeracy app for children who are behind grade level, built around one central loop: figure out the *exact* skill gap (not a vague overall score), give short targeted practice for that gap, and let both the child and the teacher watch it improve over time.
+
+**Tech stack**
+- Frontend: React + Vite + Tailwind CSS, built as a PWA (installable, offline-capable via a service worker)
+- Backend: Node.js + Express, REST API
+- Database: MongoDB Atlas (real cluster, with Mongoose models)
+- Auth: JWT-based sessions with role claims, bcrypt-hashed credentials
+- No external AI/LLM API — the "adaptive" behavior is rule-based logic running in plain JavaScript (more on this below)
+
+**User roles**
+Two logins: student (ID + PIN) and teacher (username + password), each gated behind role-checked JWT auth so a student token can never reach teacher routes or another student's data, and vice versa.
+
+**Student experience, step by step**
+- Logs in, lands on a subject choice (Reading or Math)
+- First time in a subject: a short diagnostic — works through 10 skills total (5 literacy: letter recognition, letter sounds, word reading, sentence reading, comprehension; 5 numeracy: number recognition, counting, addition, subtraction, multiplication), 2 questions per skill, difficulty adjusting based on the first answer, and it stops early the moment the child gets 2 answers in a row wrong anywhere — that's the "repeated errors" signal that flags the weak skill, rather than grinding through every question regardless
+- Skill Map: every skill shown as a plant that visually grows (seed → sprout → sapling → full bloom) based on a 0–100 mastery score — a deliberate choice over raw percentages, so a struggling reader isn't just staring at low numbers
+- Daily Rescue: a short 5-question adaptive session targeting the current weakest skill, with difficulty stepping up after 2 correct in a row and stepping down after a miss
+- Study Roadmap: after a weak skill is identified, the student gets a checklist of specific topics to work through (prioritized by the *type* of mistake detected — e.g. borrowing errors in subtraction, not just "subtraction is weak" generically). Completing the checklist unlocks a harder Level 2 test in that skill; passing levels them up, failing reopens only the specific topics tied to what was actually missed — not the whole roadmap
+- Progress screen: streaks, stars, session history, works offline since results are cached locally and synced when connectivity returns
+- Test integrity: formal tests run in enforced fullscreen with a 20-second per-question timer; exiting fullscreen or timing out terminates the attempt and sends the student back to start over
+
+**Teacher experience**
+Logs in separately, sees only students linked to their roster (never the whole student base), with each student's skill maps for both subjects, weakest-skill insight, roadmap/topic completion progress, Level 2 attempt history, and a "needs attention" flag for students stuck or repeatedly failing Level 2.
 
 
-Username
-junaidcybertech_db_user
+**🔒 Test Integrity / Anti-Distraction System**
 
-Password
-ECpRzVvOZdWMED43
+When a student starts a formal test:
 
-mongodb+srv://<db_username>:ECpRzVvOZdWMED43@cluster0.pyocxug.mongodb.net/?appName=Cluster0
+- The test automatically enters fullscreen mode.
+- Each question has a strict 20-second timer.
+
+If the student:
+
+- exits fullscreen,
+- switches to another browser tab/window,
+- minimizes or leaves the test,
+- or allows the 20-second timer to expire,
+
+→ the entire test attempt is immediately terminated.
+
+- The student is not allowed to continue from where they left off.
+- The test resets completely and the student must start again from Question 1.
+- The previous attempt is recorded as terminated, rather than being counted as a completed score.
+
+**How the "AI" actually works**
+Everything adaptive — scoring a skill up or down after each answer, deciding the next question's difficulty, picking the weakest skill, detecting *specific* mistake patterns (like a borrowing error vs. a random slip), and even the plain-language dashboard summaries — is deterministic rule-based logic, not a model call. That's intentional: it's instant, free to run, fully explainable to a teacher or judge, and keeps working with zero internet connection, which an LLM call couldn't guarantee.
+
+**Security**
+- Passwords/PINs hashed with bcrypt, never stored in plain text
+- JWT sessions with role claims, verified server-side on every protected route
+- IDOR protection — a request for a student's data is checked against who the token actually belongs to, not just trusted because an ID appears in a URL
+- Rate limiting on both login endpoints against PIN/password brute-forcing
+- No forgot/reset password by design (out of scope, teacher-mediated instead)
+
+**Privacy**
+No name, photo, or location ever collected — identity is an anonymous ID with an optional nickname and emoji avatar. Webcam-based proctoring was prototyped separately and has since been removed from the project entirely; fullscreen + timer enforcement is the current test-integrity mechanism.
+
+One honest note: the diagnostic engine, question bank, and original screens were built and directly tested end-to-end earlier in this process. Auth, the study roadmap, and the fullscreen/timer lockdown were handed off as VS Code prompts for you to implement — worth a quick pass to confirm each landed exactly as designed before you present this as finished.
 
 
 
+** TECHNICAL WORKFLOW **
+
+Here's the flow broken down event by event — same "X happens → this layer does Y → goes here" style as your example.
+
+**Student Login**
+- React form collects ID + PIN → sent to Express API
+- Express compares the PIN against the bcrypt-hashed version stored in MongoDB
+- If it matches, Express signs a JWT (with `role: student`) and sends it back
+- React stores that token and attaches it to every request from here on
+
+**Teacher Login**
+- Same flow, different collection — Express checks teacher credentials, signs a JWT with `role: teacher`
+- Every protected route on the backend checks this role before returning anything, so a student token physically can't pull teacher data
+
+**Taking a Test (Diagnostic / Daily Rescue)**
+- Questions aren't fetched from MongoDB at all — they're bundled directly into the React app, so they load instantly and even work offline
+- As the student answers, the scoring/adaptive logic (plain JS, also bundled into React) grades each answer **locally, in the browser**, instantly — no server round-trip needed for feedback
+- Once the session ends, React sends the *raw answers* (not the score) to Express
+- Express **re-grades everything itself** using the same logic, never trusting a score the client computed — then saves the graded results to MongoDB via Mongoose
+
+**Progress Screen**
+- Reads from the browser's local storage first (instant, works offline)
+- If online, also calls Express → MongoDB in the background to pull the latest and refresh that local cache
+
+**Study Roadmap / Level 2**
+- Ticking a topic → React calls Express → MongoDB marks it complete
+- "Is Level 2 unlocked?" is decided by Express reading MongoDB (all topics done?), not decided in the frontend
+- Level 2 test reuses the same test flow → Express grades it, updates pass/fail + which topics reopen, saves to MongoDB
+
+**Teacher Dashboard**
+- React calls Express with the teacher's JWT
+- Express checks the role **and** confirms this teacher is actually linked to the requested student (not just any student ID)
+- Express queries MongoDB for that student's skill profile, sessions, and roadmap progress, returns it as JSON
+- React just displays it — no real computation happens on the frontend here, it's all precomputed server-side
+
+**Fullscreen + Timer Lockdown**
+- Pure browser/React logic (Fullscreen API + JS timer) — no backend or database involved at all, *until* it terminates a test, at which point that event goes through the same Express → MongoDB save as any other test attempt
+
+**Offline/PWA Behavior**
+- A service worker (separate from MongoDB entirely) caches the app's own code, fonts, and recent responses in the browser's cache storage
+- That's specifically what lets the app open and run with no internet connection at all
+
+**Short version:** React never talks to MongoDB directly — it only ever talks to Express, and Express is the only thing that talks to MongoDB. The browser also keeps its own local copy of key data (profile, cached progress, offline queue) so the student side keeps working even when that Express connection is temporarily gone.
 
 
 furqan 
