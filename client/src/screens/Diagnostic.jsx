@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ChildScreen } from "../components/ui.jsx";
+import { ChildScreen, BigButton } from "../components/ui.jsx";
 import { QuestionRunner } from "../components/QuestionRunner.jsx";
 import { CameraConsentNotice } from "../components/CameraConsentNotice.jsx";
 import { useApp } from "../context/AppContext.jsx";
 import { getQuestionsForSkill } from "../lib/questionBank.js";
 import { skillsForSubject, hasRepeatedErrors, applyAttemptsToProfile, pickWeakestSkill, masteryTier } from "../lib/adaptiveEngine.js";
-import { recordDiagnostic } from "../lib/api.js";
-import { addLocalSession } from "../lib/offlineStore.js";
+import { recordDiagnostic, recordTermination, trySync } from "../lib/api.js";
+import { addLocalSession, enqueueSyncEvent } from "../lib/offlineStore.js";
 import { useTestMonitor } from "../lib/useTestMonitor.js";
+import { useLockdownTest } from "../lib/useLockdownTest.js";
 
 function pickQuestion(subject, skill, targetDifficulty, excludeIds) {
   const pool = getQuestionsForSkill(subject, skill).filter((q) => !excludeIds.includes(q.id));
@@ -16,7 +17,17 @@ function pickQuestion(subject, skill, targetDifficulty, excludeIds) {
   return [...pool].sort((a, b) => Math.abs(a.difficulty - targetDifficulty) - Math.abs(b.difficulty - targetDifficulty))[0];
 }
 
+function buildSession(subject, skills) {
+  const firstQuestion = pickQuestion(subject, skills[0], 2, []);
+  return { skillIndex: 0, askedIds: [firstQuestion.id], attempts: [], question: firstQuestion, sessionId: crypto.randomUUID() };
+}
+
 const SUBJECT_TITLE = { literacy: "Reading Quick Check", numeracy: "Math Quick Check" };
+
+const TERMINATION_MESSAGE = {
+  fullscreen_exit: "That attempt ended because you left fullscreen.",
+  timeout: "That attempt ended because time ran out on a question.",
+};
 
 export default function Diagnostic() {
   const { subject } = useParams();
@@ -24,16 +35,56 @@ export default function Diagnostic() {
   const { student, studentToken, skillProfile, updateSkillProfile } = useApp();
   const skills = skillsForSubject(subject);
 
-  const [session, setSession] = useState(() => {
-    const firstQuestion = pickQuestion(subject, skills[0], 2, []);
-    return { skillIndex: 0, askedIds: [firstQuestion.id], attempts: [], question: firstQuestion, sessionId: crypto.randomUUID() };
-  });
+  const [session, setSession] = useState(() => buildSession(subject, skills));
+  const [phase, setPhase] = useState("idle"); // "idle" | "active"
+  const [terminationReason, setTerminationReason] = useState(null);
+  const [startError, setStartError] = useState(null);
+  const [hasAnswered, setHasAnswered] = useState(false);
+
   const { warning } = useTestMonitor({
-    isActive: true,
+    isActive: phase === "active",
     studentId: student?.studentId,
     studentToken,
     sessionId: session.sessionId,
   });
+
+  function handleTerminate(reason) {
+    if (student?.studentId && studentToken) {
+      recordTermination(student.studentId, studentToken, {
+        type: "diagnostic",
+        subject,
+        skill: null,
+        sessionId: session.sessionId,
+        reason,
+      });
+      enqueueSyncEvent({
+        type: "proctoring",
+        payload: { studentId: student.studentId, sessionId: session.sessionId, eventType: reason, createdAt: new Date().toISOString() },
+      });
+      trySync(student.studentId, studentToken);
+    }
+    setTerminationReason(reason);
+    setPhase("idle");
+  }
+
+  const { secondsLeft, enterFullscreenLockdown } = useLockdownTest({
+    isActive: phase === "active",
+    hasAnsweredCurrent: hasAnswered,
+    questionKey: session.question?.id,
+    onTerminate: handleTerminate,
+  });
+
+  async function handleStart() {
+    setStartError(null);
+    const ok = await enterFullscreenLockdown();
+    if (!ok) {
+      setStartError("Fullscreen is required to start this test — please allow it and try again.");
+      return;
+    }
+    setSession(buildSession(subject, skills));
+    setHasAnswered(false);
+    setPhase("active");
+  }
 
   function finish(attempts) {
     const updatedProfile = applyAttemptsToProfile(skillProfile, attempts);
@@ -66,7 +117,12 @@ export default function Diagnostic() {
     });
   }
 
+  function handleAnswered() {
+    setHasAnswered(true);
+  }
+
   function handleNext(attempt) {
+    setHasAnswered(false);
     const attempts = [...session.attempts, attempt];
 
     if (hasRepeatedErrors(attempts.map((a) => a.correct))) {
@@ -94,20 +150,38 @@ export default function Diagnostic() {
     setSession({ ...session, skillIndex: nextSkillIndex, attempts, askedIds: [...session.askedIds, q1.id], question: q1 });
   }
 
+  if (phase === "idle") {
+    return (
+      <ChildScreen className="items-center justify-center text-center">
+        <CameraConsentNotice />
+        <h1 className="text-xl font-extrabold text-ink/70 mb-2">{SUBJECT_TITLE[subject]}</h1>
+        <p className="text-sm text-ink/60 font-semibold mb-4 max-w-xs mx-auto">
+          This test locks to fullscreen and gives 20 seconds per question. Leaving fullscreen or running out of time ends the attempt.
+        </p>
+        {terminationReason && <p className="text-coral-dark text-sm font-semibold mb-4">{TERMINATION_MESSAGE[terminationReason]}</p>}
+        {startError && <p className="text-coral-dark text-sm font-semibold mb-4">{startError}</p>}
+        <BigButton onClick={handleStart}>Start Test</BigButton>
+      </ChildScreen>
+    );
+  }
+
   return (
     <ChildScreen>
-      <CameraConsentNotice />
       {warning && (
         <div className="bg-marigold/10 border border-marigold/30 rounded-xl2 p-3 mb-4 text-center text-sm font-semibold text-marigold-dark">
           Stay visible and on this tab.
         </div>
       )}
-      <h1 className="text-xl font-extrabold text-center text-ink/70 mb-4">{SUBJECT_TITLE[subject]}</h1>
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-extrabold text-ink/70">{SUBJECT_TITLE[subject]}</h1>
+        <span className="text-sm font-extrabold text-ink/50 tabular-nums">{secondsLeft}s</span>
+      </div>
       <QuestionRunner
         question={session.question}
         progressCurrent={session.attempts.length}
         progressTotal={skills.length * 2}
         onNext={handleNext}
+        onAnswered={handleAnswered}
       />
     </ChildScreen>
   );

@@ -4,8 +4,10 @@ import { ChevronLeft, Lock, Check, Trophy } from "lucide-react";
 import { ChildScreen, BigButton, SpeakerButton, LoadingSprout } from "../components/ui.jsx";
 import { QuestionRunner } from "../components/QuestionRunner.jsx";
 import { useApp } from "../context/AppContext.jsx";
-import { fetchAllRoadmaps, setTopicComplete } from "../lib/api.js";
+import { fetchAllRoadmaps, setTopicComplete, trySync } from "../lib/api.js";
+import { enqueueSyncEvent } from "../lib/offlineStore.js";
 import { SKILL_LABELS, getQuestionsForSkill } from "../lib/questionBank.js";
+import { useLockdownTest } from "../lib/useLockdownTest.js";
 
 /** Picks one existing question from the regular (already offline-bundled) bank as a
  *  topic's "quick check" — reuses real content instead of authoring a parallel set
@@ -98,7 +100,29 @@ export default function StudyPlan() {
   const { student, studentToken } = useApp();
   const [roadmaps, setRoadmaps] = useState(null);
   const [error, setError] = useState(null);
-  const [quickCheck, setQuickCheck] = useState(null); // { subject, skill, topic, question } | null
+  const [quickCheck, setQuickCheck] = useState(null); // { subject, skill, topic, question, sessionId } | null
+  const [hasAnswered, setHasAnswered] = useState(false);
+  const [startError, setStartError] = useState(null);
+
+  function handleQuickCheckTerminate(reason) {
+    if (student?.studentId && studentToken && quickCheck) {
+      // Quick-checks never create a Session record even on success — stays session-less
+      // when terminated too, only the event is logged (same pipeline as the webcam events).
+      enqueueSyncEvent({
+        type: "proctoring",
+        payload: { studentId: student.studentId, sessionId: quickCheck.sessionId, eventType: reason, createdAt: new Date().toISOString() },
+      });
+      trySync(student.studentId, studentToken);
+    }
+    setQuickCheck(null);
+  }
+
+  const { secondsLeft, enterFullscreenLockdown } = useLockdownTest({
+    isActive: !!quickCheck,
+    hasAnsweredCurrent: hasAnswered,
+    questionKey: quickCheck?.question?.id,
+    onTerminate: handleQuickCheckTerminate,
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -117,14 +141,23 @@ export default function StudyPlan() {
     };
   }, [student?.studentId, studentToken]);
 
-  function handleTopicTap(subject, skill, topic) {
+  async function handleTopicTap(subject, skill, topic) {
     if (topic.complete) {
       // Un-checking is a plain toggle, no quiz required — this is a self-report undo.
       applyTopicUpdate(subject, skill, topic.id, false);
       return;
     }
+    setStartError(null);
+    // The tap itself is the qualifying user gesture for fullscreen — no separate
+    // Start screen needed for a one-question check.
+    const ok = await enterFullscreenLockdown();
+    if (!ok) {
+      setStartError("Fullscreen is required to start this quick check — please allow it and try again.");
+      return;
+    }
     const question = pickQuickCheckQuestion(subject, skill, topic.difficulty);
-    setQuickCheck({ subject, skill, topic, question });
+    setHasAnswered(false);
+    setQuickCheck({ subject, skill, topic, question, sessionId: crypto.randomUUID() });
   }
 
   async function applyTopicUpdate(subject, skill, topicId, complete) {
@@ -147,8 +180,17 @@ export default function StudyPlan() {
   if (quickCheck) {
     return (
       <ChildScreen>
-        <p className="text-center font-bold text-ink/60 mb-4">Quick check: {SKILL_LABELS[quickCheck.skill]}</p>
-        <QuestionRunner question={quickCheck.question} progressCurrent={0} progressTotal={1} onNext={handleQuickCheckNext} />
+        <div className="flex items-center justify-between mb-4">
+          <p className="font-bold text-ink/60">Quick check: {SKILL_LABELS[quickCheck.skill]}</p>
+          <span className="text-sm font-extrabold text-ink/50 tabular-nums">{secondsLeft}s</span>
+        </div>
+        <QuestionRunner
+          question={quickCheck.question}
+          progressCurrent={0}
+          progressTotal={1}
+          onNext={handleQuickCheckNext}
+          onAnswered={() => setHasAnswered(true)}
+        />
       </ChildScreen>
     );
   }
@@ -166,6 +208,7 @@ export default function StudyPlan() {
         <SpeakerButton text="Here's your study plan. Finish the topics to unlock the Level 2 test!" size={36} />
       </div>
       <p className="text-center text-ink/60 font-semibold mb-6 text-sm">Finish the topics to unlock each Level 2 test!</p>
+      {startError && <p className="text-coral-dark text-center font-semibold text-sm mb-4">{startError}</p>}
 
       <div className="flex-1 overflow-y-auto">
         {!roadmaps && !error && <LoadingSprout label="Loading your study plan..." />}

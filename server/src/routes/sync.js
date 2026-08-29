@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { processDiagnosticSubmit, processRescueSubmit } from "../services/sessionProcessor.js";
+import { processDiagnosticSubmit, processRescueSubmit, processTerminationEvent } from "../services/sessionProcessor.js";
 import { requireStudentOrTeacher } from "../services/auth.service.js";
 import * as repo from "../services/repository.js";
 
@@ -24,6 +24,8 @@ router.post("/:studentId", requireStudentOrTeacher, async (req, res, next) => {
         // Warn-and-log only — never gates or terminates a test.
         await repo.logProctoringEvents([{ ...event.payload, studentId: req.params.studentId }]);
         results.push({ type: "proctoring", result: { logged: true } });
+      } else if (event.type === "termination") {
+        results.push({ type: "termination", result: await processTerminationEvent(req.params.studentId, event.payload) });
       } else {
         results.push({ type: event.type, error: "unknown event type" });
       }

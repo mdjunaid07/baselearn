@@ -29,6 +29,7 @@ router.get("/students", requireTeacherAuth, async (req, res, next) => {
         // per-event detail, kept neutral (not framed as "cheating") on the client.
         const flagCounts = await repo.getProctoringEventCountsBySession(student.studentId);
         const flaggedSessionCount = sessions.filter((s) => flagCounts[s.sessionId] > 0).length;
+        const terminatedSessionCount = sessions.filter((s) => s.terminated).length;
 
         return {
           studentId: student.studentId,
@@ -44,6 +45,7 @@ router.get("/students", requireTeacherAuth, async (req, res, next) => {
           roadmaps,
           needsAttention,
           flaggedSessionCount,
+          terminatedSessionCount,
         };
       })
     );

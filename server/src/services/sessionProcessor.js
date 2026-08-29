@@ -36,6 +36,31 @@ function gradeRawAttempts(studentId, sessionId, subject, rawAttempts) {
   });
 }
 
+/** A lockdown termination (fullscreen exit / 20s question timeout) discards whatever
+ *  was answered so far — no grading, no logAttempts, no skill-profile change — and
+ *  just leaves a minimal 0-question Session record so the attempt is still visible
+ *  next to normal completions on Progress/TeacherDashboard. */
+export async function processTerminationEvent(studentId, { type, subject, skill, sessionId, reason }) {
+  const sid = sessionId || repo.newSessionId();
+  await repo.createSession({
+    studentId,
+    sessionId: sid,
+    type,
+    subject,
+    skill: skill ?? null,
+    startedAt: new Date().toISOString(),
+    completedAt: new Date().toISOString(),
+    questionCount: 0,
+    correctCount: 0,
+    starsEarned: 0,
+    skillScoreBefore: null,
+    skillScoreAfter: null,
+    terminated: true,
+    terminationReason: reason,
+  });
+  return { sessionId: sid, terminated: true, terminationReason: reason };
+}
+
 export async function processDiagnosticSubmit(studentId, { subject, sessionId, startedAt, attempts: rawAttempts }) {
   const sid = sessionId || repo.newSessionId();
   const graded = gradeRawAttempts(studentId, sid, subject, rawAttempts);

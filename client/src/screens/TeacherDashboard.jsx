@@ -90,6 +90,9 @@ function StudentCard({ student }) {
         {student.flaggedSessionCount > 0 && (
           <span>Attention check flagged in {student.flaggedSessionCount} session{student.flaggedSessionCount === 1 ? "" : "s"}</span>
         )}
+        {student.terminatedSessionCount > 0 && (
+          <span>{student.terminatedSessionCount} attempt{student.terminatedSessionCount === 1 ? "" : "s"} ended early</span>
+        )}
       </div>
 
       {(weakLit || weakNum) && (

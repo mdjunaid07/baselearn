@@ -13,6 +13,10 @@ const sessionSchema = new mongoose.Schema({
   starsEarned: { type: Number, required: true },
   skillScoreBefore: { type: Number, default: null },
   skillScoreAfter: { type: Number, default: null },
+  // Lockdown termination (fullscreen exit / 20s question timeout) — answers were
+  // discarded, never graded, so this always pairs with questionCount: 0.
+  terminated: { type: Boolean, default: false },
+  terminationReason: { type: String, enum: ["fullscreen_exit", "timeout", null], default: null },
 });
 
 export default mongoose.model("Session", sessionSchema);

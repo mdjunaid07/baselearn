@@ -6,8 +6,15 @@ import { CameraConsentNotice } from "../components/CameraConsentNotice.jsx";
 import { useApp } from "../context/AppContext.jsx";
 import { getLevel2QuestionsForSkill } from "../lib/level2QuestionBank.js";
 import { SKILL_LABELS } from "../lib/questionBank.js";
-import { submitLevel2Test } from "../lib/api.js";
+import { submitLevel2Test, recordTermination, trySync } from "../lib/api.js";
+import { enqueueSyncEvent } from "../lib/offlineStore.js";
 import { useTestMonitor } from "../lib/useTestMonitor.js";
+import { useLockdownTest } from "../lib/useLockdownTest.js";
+
+const TERMINATION_MESSAGE = {
+  fullscreen_exit: "That attempt ended because you left fullscreen.",
+  timeout: "That attempt ended because time ran out on a question.",
+};
 
 /** Reuses QuestionRunner exactly like Diagnostic.jsx/DailyRescue.jsx do — this screen
  *  only owns which question is current and collects attempts; grading feedback and
@@ -17,7 +24,11 @@ export default function Level2Test() {
   const navigate = useNavigate();
   const { student, studentToken } = useApp();
   const [questions] = useState(() => getLevel2QuestionsForSkill(subject, skill));
-  const [sessionId] = useState(() => crypto.randomUUID());
+  const [sessionId, setSessionId] = useState(() => crypto.randomUUID());
+  const [phase, setPhase] = useState("idle"); // "idle" | "active"
+  const [terminationReason, setTerminationReason] = useState(null);
+  const [startError, setStartError] = useState(null);
+  const [hasAnswered, setHasAnswered] = useState(false);
   const [index, setIndex] = useState(0);
   const [attempts, setAttempts] = useState([]);
   // The exact set last handed to finish() — separate from `attempts` state, which
@@ -27,12 +38,49 @@ export default function Level2Test() {
   const [pendingSubmit, setPendingSubmit] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+
+  const lockdownActive = phase === "active" && !submitting && !error;
+
   const { warning } = useTestMonitor({
-    isActive: questions.length > 0,
+    isActive: lockdownActive,
     studentId: student?.studentId,
     studentToken,
     sessionId,
   });
+
+  function handleTerminate(reason) {
+    if (student?.studentId && studentToken) {
+      recordTermination(student.studentId, studentToken, { type: "level2", subject, skill, sessionId, reason });
+      enqueueSyncEvent({
+        type: "proctoring",
+        payload: { studentId: student.studentId, sessionId, eventType: reason, createdAt: new Date().toISOString() },
+      });
+      trySync(student.studentId, studentToken);
+    }
+    setTerminationReason(reason);
+    setPhase("idle");
+  }
+
+  const { secondsLeft, enterFullscreenLockdown } = useLockdownTest({
+    isActive: lockdownActive,
+    hasAnsweredCurrent: hasAnswered,
+    questionKey: questions[index]?.id,
+    onTerminate: handleTerminate,
+  });
+
+  async function handleStart() {
+    setStartError(null);
+    const ok = await enterFullscreenLockdown();
+    if (!ok) {
+      setStartError("Fullscreen is required to start this test — please allow it and try again.");
+      return;
+    }
+    setSessionId(crypto.randomUUID());
+    setIndex(0);
+    setAttempts([]);
+    setHasAnswered(false);
+    setPhase("active");
+  }
 
   async function finish(allAttempts) {
     setPendingSubmit(allAttempts);
@@ -50,7 +98,12 @@ export default function Level2Test() {
     }
   }
 
+  function handleAnswered() {
+    setHasAnswered(true);
+  }
+
   function handleNext(attempt) {
+    setHasAnswered(false);
     const next = [...attempts, attempt];
     if (index + 1 >= questions.length) {
       finish(next);
@@ -64,6 +117,21 @@ export default function Level2Test() {
     return (
       <ChildScreen className="items-center justify-center text-center">
         <p className="font-bold text-ink/60">There's no Level 2 test set up for this skill yet.</p>
+      </ChildScreen>
+    );
+  }
+
+  if (phase === "idle") {
+    return (
+      <ChildScreen className="items-center justify-center text-center">
+        <CameraConsentNotice />
+        <h1 className="text-xl font-extrabold text-ink/70 mb-2">Level 2 Test: {SKILL_LABELS[skill] ?? skill}</h1>
+        <p className="text-sm text-ink/60 font-semibold mb-4 max-w-xs mx-auto">
+          This test locks to fullscreen and gives 20 seconds per question. Leaving fullscreen or running out of time ends the attempt.
+        </p>
+        {terminationReason && <p className="text-coral-dark text-sm font-semibold mb-4">{TERMINATION_MESSAGE[terminationReason]}</p>}
+        {startError && <p className="text-coral-dark text-sm font-semibold mb-4">{startError}</p>}
+        <BigButton onClick={handleStart}>Start Test</BigButton>
       </ChildScreen>
     );
   }
@@ -90,14 +158,22 @@ export default function Level2Test() {
 
   return (
     <ChildScreen>
-      <CameraConsentNotice />
       {warning && (
         <div className="bg-marigold/10 border border-marigold/30 rounded-xl2 p-3 mb-4 text-center text-sm font-semibold text-marigold-dark">
           Stay visible and on this tab.
         </div>
       )}
-      <h1 className="text-xl font-extrabold text-center text-ink/70 mb-4">Level 2 Test: {SKILL_LABELS[skill] ?? skill}</h1>
-      <QuestionRunner question={questions[index]} progressCurrent={index} progressTotal={questions.length} onNext={handleNext} />
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-extrabold text-ink/70">Level 2 Test: {SKILL_LABELS[skill] ?? skill}</h1>
+        <span className="text-sm font-extrabold text-ink/50 tabular-nums">{secondsLeft}s</span>
+      </div>
+      <QuestionRunner
+        question={questions[index]}
+        progressCurrent={index}
+        progressTotal={questions.length}
+        onNext={handleNext}
+        onAnswered={handleAnswered}
+      />
     </ChildScreen>
   );
 }

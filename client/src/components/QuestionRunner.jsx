@@ -13,7 +13,7 @@ const randomFrom = (arr) => arr[Math.floor(Math.random() * arr.length)];
  * time, grades it locally via the shared adaptive engine, shows encouraging feedback
  * (never shame-based), and hands the graded attempt back via onNext.
  */
-export function QuestionRunner({ question, progressCurrent, progressTotal, onNext }) {
+export function QuestionRunner({ question, progressCurrent, progressTotal, onNext, onAnswered }) {
   const [phase, setPhase] = useState("asking"); // 'asking' | 'feedback'
   const [selected, setSelected] = useState(null);
   const [numericValue, setNumericValue] = useState("");
@@ -48,6 +48,7 @@ export function QuestionRunner({ question, progressCurrent, progressTotal, onNex
     setFeedbackPhrase(phrase);
     setPhase("feedback");
     speak(phrase);
+    onAnswered?.();
   }
 
   const correctLabel = question.type === "numeric" ? String(question.correctAnswer) : question.options.find((o) => o.correct)?.label;

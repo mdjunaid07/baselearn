@@ -76,6 +76,14 @@ export async function recordRescue(studentId, token, payload) {
   return trySync(studentId, token);
 }
 
+/** Lockdown termination (fullscreen exit / 20s question timeout) — answers were
+ *  already discarded client-side; this just leaves a minimal 0-question Session
+ *  record so the attempt is visible next to normal completions. */
+export async function recordTermination(studentId, token, payload) {
+  enqueueSyncEvent({ type: "termination", payload });
+  return trySync(studentId, token);
+}
+
 export async function trySync(studentId, token) {
   if (typeof navigator !== "undefined" && !navigator.onLine) return { synced: false, reason: "offline" };
   const queue = getQueue();

@@ -155,9 +155,18 @@ export default function ProgressScreen() {
               <p className="font-bold">{s.type === "diagnostic" ? "Quick Check" : SKILL_LABELS[s.skill] ?? s.skill}</p>
               <p className="text-xs text-ink/50 font-semibold">{new Date(s.completedAt).toLocaleDateString()}</p>
               {s.flaggedEventCount > 0 && <p className="text-xs text-ink/40 font-semibold mt-0.5">Attention check flagged</p>}
+              {s.terminated && (
+                <p className="text-xs text-ink/40 font-semibold mt-0.5">
+                  {s.terminationReason === "fullscreen_exit" ? "Ended early — left fullscreen" : "Ended early — time ran out"}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-1 text-marigold font-extrabold">
-              <Star size={16} fill="currentColor" /> {s.starsEarned ?? s.correctCount}
+              {!s.terminated && (
+                <>
+                  <Star size={16} fill="currentColor" /> {s.starsEarned ?? s.correctCount}
+                </>
+              )}
             </div>
           </div>
         ))}

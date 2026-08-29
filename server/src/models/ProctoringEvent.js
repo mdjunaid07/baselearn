@@ -5,7 +5,11 @@ import mongoose from "mongoose";
 const proctoringEventSchema = new mongoose.Schema({
   studentId: { type: String, required: true, index: true },
   sessionId: { type: String, required: true, index: true },
-  eventType: { type: String, enum: ["multiple_faces", "no_face", "head_movement", "tab_switch"], required: true },
+  eventType: {
+    type: String,
+    enum: ["multiple_faces", "no_face", "head_movement", "tab_switch", "fullscreen_exit", "timeout"],
+    required: true,
+  },
   createdAt: { type: Date, default: Date.now },
 });
 
