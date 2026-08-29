@@ -10,6 +10,7 @@ const skillProfiles = new Map(); // studentId -> { studentId, literacy, numeracy
 const attempts = []; // flat log, filtered per-query
 const sessions = new Map(); // sessionId -> session
 const roadmaps = new Map(); // `${studentId}:${subject}:${skill}` -> roadmap record
+const proctoringEvents = []; // flat log, same shape as attempts
 
 export function reset() {
   students.clear();
@@ -17,6 +18,7 @@ export function reset() {
   attempts.length = 0;
   sessions.clear();
   roadmaps.clear();
+  proctoringEvents.length = 0;
 }
 
 export async function createStudent({ nickname, avatarId }) {
@@ -101,4 +103,18 @@ export async function saveStudentRoadmap(studentId, subject, skill, data) {
   const record = { studentId, subject, skill, ...data, updatedAt: new Date().toISOString() };
   roadmaps.set(roadmapKey(studentId, subject, skill), record);
   return record;
+}
+
+export async function logProctoringEvents(eventDocs) {
+  for (const e of eventDocs) proctoringEvents.push({ ...e, createdAt: e.createdAt || new Date().toISOString() });
+  return eventDocs;
+}
+
+export async function getProctoringEventCountsBySession(studentId) {
+  const counts = {};
+  for (const e of proctoringEvents) {
+    if (e.studentId !== studentId) continue;
+    counts[e.sessionId] = (counts[e.sessionId] || 0) + 1;
+  }
+  return counts;
 }

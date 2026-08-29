@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChildScreen } from "../components/ui.jsx";
 import { QuestionRunner } from "../components/QuestionRunner.jsx";
+import { CameraConsentNotice } from "../components/CameraConsentNotice.jsx";
 import { useApp } from "../context/AppContext.jsx";
 import { getQuestionsForSkill } from "../lib/questionBank.js";
 import { skillsForSubject, hasRepeatedErrors, applyAttemptsToProfile, pickWeakestSkill, masteryTier } from "../lib/adaptiveEngine.js";
 import { recordDiagnostic } from "../lib/api.js";
 import { addLocalSession } from "../lib/offlineStore.js";
+import { useTestMonitor } from "../lib/useTestMonitor.js";
 
 function pickQuestion(subject, skill, targetDifficulty, excludeIds) {
   const pool = getQuestionsForSkill(subject, skill).filter((q) => !excludeIds.includes(q.id));
@@ -24,7 +26,13 @@ export default function Diagnostic() {
 
   const [session, setSession] = useState(() => {
     const firstQuestion = pickQuestion(subject, skills[0], 2, []);
-    return { skillIndex: 0, askedIds: [firstQuestion.id], attempts: [], question: firstQuestion };
+    return { skillIndex: 0, askedIds: [firstQuestion.id], attempts: [], question: firstQuestion, sessionId: crypto.randomUUID() };
+  });
+  const { warning } = useTestMonitor({
+    isActive: true,
+    studentId: student?.studentId,
+    studentToken,
+    sessionId: session.sessionId,
   });
 
   function finish(attempts) {
@@ -36,6 +44,7 @@ export default function Diagnostic() {
     if (student?.studentId && studentToken) {
       recordDiagnostic(student.studentId, studentToken, {
         subject,
+        sessionId: session.sessionId,
         attempts: attempts.map(({ questionId, answer, responseTimeMs }) => ({ questionId, answer, responseTimeMs })),
       });
     }
@@ -82,11 +91,17 @@ export default function Diagnostic() {
     }
     const nextSkill = skills[nextSkillIndex];
     const q1 = pickQuestion(subject, nextSkill, 2, session.askedIds);
-    setSession({ skillIndex: nextSkillIndex, attempts, askedIds: [...session.askedIds, q1.id], question: q1 });
+    setSession({ ...session, skillIndex: nextSkillIndex, attempts, askedIds: [...session.askedIds, q1.id], question: q1 });
   }
 
   return (
     <ChildScreen>
+      <CameraConsentNotice />
+      {warning && (
+        <div className="bg-marigold/10 border border-marigold/30 rounded-xl2 p-3 mb-4 text-center text-sm font-semibold text-marigold-dark">
+          Stay visible and on this tab.
+        </div>
+      )}
       <h1 className="text-xl font-extrabold text-center text-ink/70 mb-4">{SUBJECT_TITLE[subject]}</h1>
       <QuestionRunner
         question={session.question}

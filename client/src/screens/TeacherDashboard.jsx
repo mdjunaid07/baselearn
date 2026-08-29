@@ -87,6 +87,9 @@ function StudentCard({ student }) {
           {student.sessionCount} session{student.sessionCount === 1 ? "" : "s"}
         </span>
         <span>{student.lastSessionAt ? `Last active ${new Date(student.lastSessionAt).toLocaleDateString()}` : "No sessions yet"}</span>
+        {student.flaggedSessionCount > 0 && (
+          <span>Attention check flagged in {student.flaggedSessionCount} session{student.flaggedSessionCount === 1 ? "" : "s"}</span>
+        )}
       </div>
 
       {(weakLit || weakNum) && (

@@ -20,6 +20,8 @@ router.get("/:studentId", requireStudentOrTeacher, async (req, res, next) => {
     const profile = (await repo.getSkillProfile(studentId)) ?? { ...emptySkillProfile() };
     const sessions = await repo.getSessions(studentId);
     const attempts = await repo.getAttempts(studentId);
+    const flagCounts = await repo.getProctoringEventCountsBySession(studentId);
+    const flaggedSessionCount = sessions.filter((s) => flagCounts[s.sessionId] > 0).length;
 
     const insight = buildParentInsight({ nickname: student.nickname, skillProfile: profile, sessions, attempts });
 
@@ -38,6 +40,7 @@ router.get("/:studentId", requireStudentOrTeacher, async (req, res, next) => {
       },
       sessionCount: sessions.length,
       lastSessionAt: sessions.length ? sessions[sessions.length - 1].completedAt : null,
+      flaggedSessionCount,
       insight,
     });
   } catch (err) {

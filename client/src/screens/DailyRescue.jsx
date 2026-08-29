@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChildScreen } from "../components/ui.jsx";
 import { QuestionRunner } from "../components/QuestionRunner.jsx";
+import { CameraConsentNotice } from "../components/CameraConsentNotice.jsx";
 import { useApp } from "../context/AppContext.jsx";
 import { getQuestionsForSkill, SKILL_LABELS } from "../lib/questionBank.js";
 import { pickWeakestSkill, startingDifficulty, nextDifficulty, applyAttemptsToProfile, masteryTier } from "../lib/adaptiveEngine.js";
 import { recordRescue } from "../lib/api.js";
 import { addLocalSession } from "../lib/offlineStore.js";
+import { useTestMonitor } from "../lib/useTestMonitor.js";
 
 const SESSION_LENGTH = 5;
 const TIER_ORDER = ["seed", "sprout", "sapling", "bloom"];
@@ -26,7 +28,13 @@ export default function DailyRescue() {
     const skill = pickWeakestSkill(skillProfile, subject);
     const difficulty = startingDifficulty(skillProfile[subject][skill]);
     const question = pickQuestion(subject, skill, difficulty, []);
-    return { skill, difficulty, askedIds: [question.id], attempts: [], question };
+    return { skill, difficulty, askedIds: [question.id], attempts: [], question, sessionId: crypto.randomUUID() };
+  });
+  const { warning } = useTestMonitor({
+    isActive: true,
+    studentId: student?.studentId,
+    studentToken,
+    sessionId: session.sessionId,
   });
 
   function finish(attempts) {
@@ -40,6 +48,7 @@ export default function DailyRescue() {
       recordRescue(student.studentId, studentToken, {
         subject,
         skill: session.skill,
+        sessionId: session.sessionId,
         attempts: attempts.map(({ questionId, answer, responseTimeMs }) => ({ questionId, answer, responseTimeMs })),
       });
     }
@@ -78,6 +87,12 @@ export default function DailyRescue() {
 
   return (
     <ChildScreen>
+      <CameraConsentNotice />
+      {warning && (
+        <div className="bg-marigold/10 border border-marigold/30 rounded-xl2 p-3 mb-4 text-center text-sm font-semibold text-marigold-dark">
+          Stay visible and on this tab.
+        </div>
+      )}
       <h1 className="text-xl font-extrabold text-center text-ink/70 mb-4">Today's Rescue: {SKILL_LABELS[session.skill]}</h1>
       <QuestionRunner
         question={session.question}

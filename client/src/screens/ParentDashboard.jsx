@@ -88,6 +88,12 @@ export default function ParentDashboard() {
           </div>
         )}
 
+        {remote?.flaggedSessionCount > 0 && (
+          <p className="text-xs text-ink/40 font-semibold mb-4">
+            Attention check flagged in {remote.flaggedSessionCount} recent session{remote.flaggedSessionCount === 1 ? "" : "s"}.
+          </p>
+        )}
+
         {offlineMode && (
           <div className="flex items-center gap-2 text-xs text-ink/40 font-medium mb-4">
             <WifiOff size={14} /> Showing data saved on this device — connect to see full history and insights.

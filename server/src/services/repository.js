@@ -11,6 +11,7 @@ import SkillProfileModel from "../models/SkillProfile.js";
 import AttemptModel from "../models/Attempt.js";
 import SessionModel from "../models/Session.js";
 import StudentRoadmapModel from "../models/StudentRoadmap.js";
+import ProctoringEventModel from "../models/ProctoringEvent.js";
 
 export async function createStudent({ nickname, avatarId }) {
   if (!isMongoConnected()) return mem.createStudent({ nickname, avatarId });
@@ -104,6 +105,24 @@ export async function getSessions(studentId, filter = {}) {
 
 export function newSessionId() {
   return randomUUID();
+}
+
+// Warn-and-log camera/tab events from useTestMonitor.js — never gates or terminates
+// a test, just recorded for the progress/dashboard views to surface.
+export async function logProctoringEvents(eventDocs) {
+  if (!isMongoConnected()) return mem.logProctoringEvents(eventDocs);
+  return ProctoringEventModel.insertMany(eventDocs);
+}
+
+/** One count per sessionId that has at least one logged event, for attaching onto
+ *  the session list in progress.js/dashboard.js without a second round trip per session. */
+export async function getProctoringEventCountsBySession(studentId) {
+  if (!isMongoConnected()) return mem.getProctoringEventCountsBySession(studentId);
+  const rows = await ProctoringEventModel.aggregate([
+    { $match: { studentId } },
+    { $group: { _id: "$sessionId", count: { $sum: 1 } } },
+  ]);
+  return Object.fromEntries(rows.map((r) => [r._id, r.count]));
 }
 
 export async function getStudentRoadmap(studentId, subject, skill) {

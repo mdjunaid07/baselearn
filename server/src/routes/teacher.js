@@ -25,6 +25,11 @@ router.get("/students", requireTeacherAuth, async (req, res, next) => {
         const roadmaps = roadmapDocs.map((r) => hydrateRoadmap(r, r.subject, r.skill));
         const needsAttention = roadmaps.some((r) => r.flagged);
 
+        // Warn-and-log camera/tab events from useTestMonitor.js — a count only, no
+        // per-event detail, kept neutral (not framed as "cheating") on the client.
+        const flagCounts = await repo.getProctoringEventCountsBySession(student.studentId);
+        const flaggedSessionCount = sessions.filter((s) => flagCounts[s.sessionId] > 0).length;
+
         return {
           studentId: student.studentId,
           nickname: student.nickname,
@@ -38,6 +43,7 @@ router.get("/students", requireTeacherAuth, async (req, res, next) => {
           },
           roadmaps,
           needsAttention,
+          flaggedSessionCount,
         };
       })
     );

@@ -1,10 +1,11 @@
 import { Router } from "express";
 import { processDiagnosticSubmit, processRescueSubmit } from "../services/sessionProcessor.js";
 import { requireStudentOrTeacher } from "../services/auth.service.js";
+import * as repo from "../services/repository.js";
 
 const router = Router();
 
-// Body: { events: [{ type: 'diagnostic' | 'rescue', payload: {...} }] }
+// Body: { events: [{ type: 'diagnostic' | 'rescue' | 'proctoring', payload: {...} }] }
 // Each event is replayed through the exact same logic a live submit would use,
 // in order, so a batch of offline sessions reconciles identically to how it
 // would have if the device had been online the whole time.
@@ -19,6 +20,10 @@ router.post("/:studentId", requireStudentOrTeacher, async (req, res, next) => {
         results.push({ type: "diagnostic", result: await processDiagnosticSubmit(req.params.studentId, event.payload) });
       } else if (event.type === "rescue") {
         results.push({ type: "rescue", result: await processRescueSubmit(req.params.studentId, event.payload) });
+      } else if (event.type === "proctoring") {
+        // Warn-and-log only — never gates or terminates a test.
+        await repo.logProctoringEvents([{ ...event.payload, studentId: req.params.studentId }]);
+        results.push({ type: "proctoring", result: { logged: true } });
       } else {
         results.push({ type: event.type, error: "unknown event type" });
       }

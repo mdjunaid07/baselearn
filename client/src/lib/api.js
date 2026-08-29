@@ -112,11 +112,11 @@ export async function setTopicComplete(studentId, token, subject, skill, topicId
   });
 }
 
-export async function submitLevel2Test(studentId, token, subject, skill, { attempts }) {
+export async function submitLevel2Test(studentId, token, subject, skill, { sessionId, attempts }) {
   return apiFetch(`/api/roadmap/${studentId}/${subject}/${skill}/level2-submit`, {
     method: "POST",
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ attempts }),
+    body: JSON.stringify({ sessionId, attempts }),
   });
 }
 

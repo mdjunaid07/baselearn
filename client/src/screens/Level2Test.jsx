@@ -2,10 +2,12 @@ import { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChildScreen, LoadingSprout, BigButton } from "../components/ui.jsx";
 import { QuestionRunner } from "../components/QuestionRunner.jsx";
+import { CameraConsentNotice } from "../components/CameraConsentNotice.jsx";
 import { useApp } from "../context/AppContext.jsx";
 import { getLevel2QuestionsForSkill } from "../lib/level2QuestionBank.js";
 import { SKILL_LABELS } from "../lib/questionBank.js";
 import { submitLevel2Test } from "../lib/api.js";
+import { useTestMonitor } from "../lib/useTestMonitor.js";
 
 /** Reuses QuestionRunner exactly like Diagnostic.jsx/DailyRescue.jsx do — this screen
  *  only owns which question is current and collects attempts; grading feedback and
@@ -15,6 +17,7 @@ export default function Level2Test() {
   const navigate = useNavigate();
   const { student, studentToken } = useApp();
   const [questions] = useState(() => getLevel2QuestionsForSkill(subject, skill));
+  const [sessionId] = useState(() => crypto.randomUUID());
   const [index, setIndex] = useState(0);
   const [attempts, setAttempts] = useState([]);
   // The exact set last handed to finish() — separate from `attempts` state, which
@@ -24,6 +27,12 @@ export default function Level2Test() {
   const [pendingSubmit, setPendingSubmit] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const { warning } = useTestMonitor({
+    isActive: questions.length > 0,
+    studentId: student?.studentId,
+    studentToken,
+    sessionId,
+  });
 
   async function finish(allAttempts) {
     setPendingSubmit(allAttempts);
@@ -31,6 +40,7 @@ export default function Level2Test() {
     setError(null);
     try {
       const result = await submitLevel2Test(student.studentId, studentToken, subject, skill, {
+        sessionId,
         attempts: allAttempts.map(({ questionId, answer, responseTimeMs }) => ({ questionId, answer, responseTimeMs })),
       });
       navigate("/study-plan/level2-result", { state: { subject, skill, ...result } });
@@ -80,6 +90,12 @@ export default function Level2Test() {
 
   return (
     <ChildScreen>
+      <CameraConsentNotice />
+      {warning && (
+        <div className="bg-marigold/10 border border-marigold/30 rounded-xl2 p-3 mb-4 text-center text-sm font-semibold text-marigold-dark">
+          Stay visible and on this tab.
+        </div>
+      )}
       <h1 className="text-xl font-extrabold text-center text-ink/70 mb-4">Level 2 Test: {SKILL_LABELS[skill] ?? skill}</h1>
       <QuestionRunner question={questions[index]} progressCurrent={index} progressTotal={questions.length} onNext={handleNext} />
     </ChildScreen>

@@ -33,8 +33,10 @@ function historyBySkill(sessions) {
 router.get("/:studentId", requireStudentOrTeacher, async (req, res, next) => {
   try {
     const sessions = await repo.getSessions(req.params.studentId);
+    const flagCounts = await repo.getProctoringEventCountsBySession(req.params.studentId);
+    const sessionsWithFlags = sessions.map((s) => ({ ...s, flaggedEventCount: flagCounts[s.sessionId] || 0 }));
     res.json({
-      sessions,
+      sessions: sessionsWithFlags,
       totalSessions: sessions.length,
       totalStars: sessions.reduce((sum, s) => sum + (s.starsEarned || 0), 0),
       streakDays: computeStreak(sessions),
